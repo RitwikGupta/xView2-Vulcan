@@ -49,7 +49,10 @@ class Files(object):
 
     def __init__(self, ident, pre_directory, post_directory, output_directory, pre, post):
         self.ident = ident
-        self.pre = pre_directory.joinpath(pre).resolve()
+        if args.bldg_polys:
+            self.pre = args.blg_polys
+        else:
+            self.pre = pre_directory.joinpath(pre).resolve()
         self.post = post_directory.joinpath(post).resolve()
         self.loc = output_directory.joinpath('loc').joinpath(f'{self.ident}.tif').resolve()
         self.dmg = output_directory.joinpath('dmg').joinpath(f'{self.ident}.tif').resolve()
