@@ -4,7 +4,6 @@ import rasterio.merge
 import rasterio.warp
 import rasterio.plot
 import rasterio.crs
-import rasterio.features
 import geopandas
 from osgeo import gdal, ogr
 from rasterio import windows
@@ -14,16 +13,6 @@ from pathlib import Path
 from loguru import logger
 from PIL import Image
 import io
-
-
-def rasterize(in_feats, out_file, out_shape):
-    df = geopandas.read_file(in_feats)
-    shapes = [(shape, 1) for shape in df.geometry]
-    out = rasterio.features.rasterize(shapes, default_value=1, out_shape=out_shape, all_touched=True)
-
-    return out
-
-
 
 
 def create_vrt(in_files, out_path, resolution='lowest'):

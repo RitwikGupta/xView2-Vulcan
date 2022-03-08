@@ -88,12 +88,3 @@ class TestGetRes:
 
     def test_get_image_res(self):
         assert raster_processing.get_res('tests/data/input/pre/tile_337-9136.tif') == (0.6, 0.6)
-
-
-class TestRasterizePolys:
-
-    def test_rasterize_polys(self):
-        in_vector = 'tests/data/misc/polygon_shapefile/intersect_polys.shp'
-        out_file = 'tests/data/output/mosaics/pre_from_footprints.tif'
-        raster_processing.rasterize(in_vector, out_file, (1024, 1024))
-        assert Path(out_file).is_file()
