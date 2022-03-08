@@ -33,7 +33,8 @@ class Args:
                  agol_user='',
                  agol_password='',
                  agol_feature_service='',
-                 dp_mode=True
+                 dp_mode=True,
+                 bldg_polys=None
                  ):
 
         self.output_directory = output_directory
@@ -52,6 +53,7 @@ class Args:
         self.agol_password = agol_password
         self.agol_feature_service = agol_feature_service
         self.dp_mode = dp_mode
+        self.bldg_polys = bldg_polys
 
 
 #### Dataframe fixtures ####

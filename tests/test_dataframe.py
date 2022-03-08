@@ -135,5 +135,6 @@ class TestBldgPolyProcess:
         with rasterio.open('tests/data/output/mosaics/post.tif') as src:
             out_shape = (src.height, src.width)
             out_transform = src.transform
-        test = utils.dataframe.bldg_poly_process(bldg_poly_df, intersect, args.destination_crs, f'{tmpdir}/bldg_mosaic.tif', out_shape, out_transform)
-        assert test == 'test'
+        out_file = f'{tmpdir}/bldg_mosaic.tif'
+        test = utils.dataframe.bldg_poly_process(bldg_poly_df, intersect, args.destination_crs, out_file, out_shape, out_transform)
+        assert Path(out_file).is_file()
