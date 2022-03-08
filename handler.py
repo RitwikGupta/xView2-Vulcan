@@ -50,7 +50,7 @@ class Files(object):
     def __init__(self, ident, pre_directory, post_directory, output_directory, pre, post):
         self.ident = ident
         if args.bldg_polys:
-            self.pre = args.blg_polys
+            self.pre = args.bldg_polys
         else:
             self.pre = pre_directory.joinpath(pre).resolve()
         self.post = post_directory.joinpath(post).resolve()
