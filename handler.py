@@ -275,9 +275,9 @@ def parse_args():
 
     parser = argparse.ArgumentParser(description='Create arguments for xView 2 handler.')
 
-    group = parser.add_mutually_exclusive_group()
-    group.add_argument('--bldg_polys', default=None, help='Building polygons to use in place of pre-incident imagery.')
-    group.add_argument('--pre_directory', metavar='/path/to/pre/files/', type=Path, required=True, help='Directory containing pre-disaster imagery. This is searched recursively.')
+    group = parser.add_mutually_exclusive_group(required=True)
+    group.add_argument('--bldg_polys', default=None, required=False, help='Building polygons to use in place of pre-incident imagery.')
+    group.add_argument('--pre_directory', metavar='/path/to/pre/files/', type=Path, required=False, help='Directory containing pre-disaster imagery. This is searched recursively.')
     
     parser.add_argument('--post_directory', metavar='/path/to/post/files/', type=Path, required=True, help='Directory containing post-disaster imagery. This is searched recursively.')
     parser.add_argument('--output_directory', metavar='/path/to/output/', type=Path, required=True, help='Directory to store output files. This will be created if it does not exist. Existing files may be overwritten.')
