@@ -70,7 +70,7 @@ class Files(object):
                                       )
 
     def get_profile(self):
-        with rasterio.open(self.pre) as src:
+        with rasterio.open(self.post) as src:
             return src.profile
 
 
