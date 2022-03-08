@@ -270,7 +270,10 @@ def parse_args():
 
     parser = argparse.ArgumentParser(description='Create arguments for xView 2 handler.')
 
-    parser.add_argument('--pre_directory', metavar='/path/to/pre/files/', type=Path, required=True, help='Directory containing pre-disaster imagery. This is searched recursively.')
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument('--bldg_polys', default=None, help='Building polygons to use in place of pre-incident imagery.')
+    group.add_argument('--pre_directory', metavar='/path/to/pre/files/', type=Path, required=True, help='Directory containing pre-disaster imagery. This is searched recursively.')
+    
     parser.add_argument('--post_directory', metavar='/path/to/post/files/', type=Path, required=True, help='Directory containing post-disaster imagery. This is searched recursively.')
     parser.add_argument('--output_directory', metavar='/path/to/output/', type=Path, required=True, help='Directory to store output files. This will be created if it does not exist. Existing files may be overwritten.')
     parser.add_argument('--n_procs', default=4, help="Number of processors for multiprocessing", type=int)
@@ -283,7 +286,6 @@ def parse_args():
     parser.add_argument('--output_resolution', default=None, help='Override minimum resolution calculator. This should be a lower resolution (higher number) than source imagery for decreased inference time. Must be in units of destinationCRS.')
     parser.add_argument('--save_intermediates', default=False, action='store_true', help='Store intermediate runfiles')
     parser.add_argument('--aoi_file', default=None, help='Shapefile or GeoJSON file of AOI polygons')
-    parser.add_argument('--bldg_polys', default=None, help='Building polygons to use in place of pre-incident imagery.')
     parser.add_argument('--agol_user', default=None, help='ArcGIS online username')
     parser.add_argument('--agol_password', default=None, help='ArcGIS online password')
     parser.add_argument('--agol_feature_service', default=None, help='ArcGIS online feature service to append damage polygons.')
@@ -307,14 +309,6 @@ def pre_post_handler(args, pre_post):
     df = utils.dataframe.make_footprint_df(files)
 
     return files, crs, df
-
-
-def bldg_poly_handler(poly_file):
-
-    df = geopandas.read_file(poly_file)
-
-    return df
-
 
 
 @logger.catch()
