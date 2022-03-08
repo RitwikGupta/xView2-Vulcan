@@ -196,7 +196,12 @@ def run_inference(loader, model_wrapper, write_output=False, mode='loc', return_
             #if '116' in result_dict['in_pre_path'][0]:
             #    import ipdb; ipdb.set_trace()
             #    debug=True
-            out = model_wrapper.forward(result_dict['img'],debug=debug)
+
+            
+            if args.bldg_polys and mode == 'loc':
+                out = result_dict['img']
+            else:
+                out = model_wrapper.forward(result_dict['img'],debug=debug)
 
             # Save prediction tensors for testing
             # Todo: Create argument for turning on debug/trace/test data
