@@ -279,6 +279,7 @@ def parse_args():
     parser.add_argument('--output_resolution', default=None, help='Override minimum resolution calculator. This should be a lower resolution (higher number) than source imagery for decreased inference time. Must be in units of destinationCRS.')
     parser.add_argument('--save_intermediates', default=False, action='store_true', help='Store intermediate runfiles')
     parser.add_argument('--aoi_file', default=None, help='Shapefile or GeoJSON file of AOI polygons')
+    parser.add_argument('--bldg_polys', default=None, help='Building polygons to use in place of pre-incident imagery.')
     parser.add_argument('--agol_user', default=None, help='ArcGIS online username')
     parser.add_argument('--agol_password', default=None, help='ArcGIS online password')
     parser.add_argument('--agol_feature_service', default=None, help='ArcGIS online feature service to append damage polygons.')
@@ -305,13 +306,14 @@ def main():
 
     # Retrieve files form input directories
     logger.info('Retrieving files...')
+    # Todo: add building polygon support
     pre_files = get_files(args.pre_directory)
     logger.debug(f'Retrieved {len(pre_files)} pre files from {args.pre_directory}')
     post_files = get_files(args.post_directory)
     logger.debug(f'Retrieved {len(post_files)} pre files from {args.post_directory}')
 
     # Create VRTs
-    # Todo: Why are we doing this?
+    # Todo: Why are we doing this? 2022/03/07 -- unknown...for another day
     pre_vrt = raster_processing.create_vrt(pre_files, args.output_directory.joinpath('vrt/pre_vrt.vrt'))
     post_vrt = raster_processing.create_vrt(post_files, args.output_directory.joinpath('vrt/post_vrt.vrt'))
 
@@ -345,6 +347,7 @@ def main():
     logger.info(f'Calculated extent: {extent}')
 
     # Calculate destination resolution
+    # Todo: add building polygon support
     res = dataframe.get_max_res(pre_df, post_df)
     logger.info(f'Calculated resolution: {res}')
 
@@ -352,6 +355,7 @@ def main():
         res = (args.output_resolution, args.output_resolution)
         logger.info(f'Calculated resolution overridden by passed argument: {res}')
 
+    # Todo: add building polygon support
     logger.info("Creating pre mosaic...")
     pre_mosaic = raster_processing.create_mosaic(
         [str(file) for file in pre_df.filename],
