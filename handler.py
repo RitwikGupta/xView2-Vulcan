@@ -350,7 +350,7 @@ def main():
         args.pre_crs, pre_files, pre_df = pre_post_handler(args, 'pre')
         pre_df = utils.dataframe.process_df(pre_df, args.destination_crs)
     else:
-        pre_df = bldg_poly_handler(args.bldg_polys)
+        pre_df = dataframe.bldg_poly_handler(args.bldg_polys)
     
 
     # # Create input CRS objects from our pre/post inputs

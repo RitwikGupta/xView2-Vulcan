@@ -186,6 +186,13 @@ def get_max_res(pre_df, post_df):
     return (x, y)
 
 
+def bldg_poly_handler(poly_file):
+
+    df = geopandas.read_file(poly_file)
+
+    return df
+
+
 def bldg_poly_process(df, intersect, dest_crs, out_file, out_shape, transform):
 
         def _clip_polys(input, mask):
