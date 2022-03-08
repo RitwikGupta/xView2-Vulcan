@@ -184,3 +184,47 @@ def get_max_res(pre_df, post_df):
     x = max(x[0] for x in res_list)
     y = max(x[1] for x in res_list)
     return (x, y)
+
+
+def bldg_poly_process(df, intersect, dest_crs, out_file, out_shape, transform):
+
+        def _clip_polys(input, mask):
+            return geopandas.clip(df, mask)
+
+        def _rasterize(in_feats, out_file, out_shape, transform, dst_crs):
+
+            image = rasterio.features.rasterize(
+                    in_feats.geometry,
+                    out_shape=out_shape,
+                    all_touched=True,
+                    transform=transform,
+                    )
+
+            assert image.sum() > 0, logger.critical('Building rasterization failed.')
+
+            with rasterio.open(
+                    out_file, 'w',
+                    driver='GTiff',
+                    dtype=rasterio.uint8,
+                    count=1,
+                    height=out_shape[0],
+                    width=out_shape[1],
+                    transform=transform,
+                    crs=dst_crs) as dst:
+                dst.write(image, indexes=1)
+
+            return out_file
+
+        # Todo: convert to destination crs before clipping
+        poly_cords = [
+                     (intersect[0], intersect[1]),
+                     (intersect[2], intersect[1]),
+                     (intersect[2], intersect[3]),
+                     (intersect[0], intersect[3])
+                     ]
+        mask = geopandas.GeoDataFrame({'geometry': [Polygon(poly_cords)]}, crs=dest_crs)
+        df = df.to_crs(dest_crs)
+        assert mask.crs == df.crs, logger.critical('CRS mismatch')
+        df = _clip_polys(df, mask)
+        mosaic = _rasterize(df, out_file, out_shape, transform, dest_crs)
+        return mosaic

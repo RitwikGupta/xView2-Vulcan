@@ -72,6 +72,11 @@ def post_df():
     df = utils.dataframe.process_df(df, args.destination_crs)
     return df
 
+@pytest.fixture(scope='session')
+def bldg_poly_df():
+    df = geopandas.read_file('tests/data/misc/bldg_polys.gpkg')
+    return df
+
 
 @pytest.fixture(scope='session')
 def no_intersect_df():

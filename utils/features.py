@@ -2,6 +2,7 @@ import rasterio
 from rasterio.features import dataset_features
 from osgeo import gdal
 import geopandas
+from loguru import logger
 
 
 def create_polys(in_files, threshold=30):
@@ -68,31 +69,3 @@ def create_centroids(features):
     cent_df = geopandas.GeoDataFrame.from_features(features.centroid, crs=features.crs)
     cent_df['dmg'] = features.dmg
     return cent_df
-
-
-def rasterize(in_feats, out_file, out_shape):
-    df = geopandas.read_file(in_feats)
-
-    transform = rasterio.transform.from_bounds(*df['geometry'].total_bounds, *out_shape)
-    shapes = ((shape) for shape in df.geometry)
-
-
-    image = rasterio.features.rasterize(
-            shapes,
-            out_shape=out_shape,
-            all_touched=True,
-            transform=transform,
-            )
-
-    assert image.sum() > 0
-
-    with rasterio.open(
-            out_file, 'w',
-            driver='GTiff',
-            dtype=rasterio.uint8,
-            count=1,
-            width=out_shape[0],
-            height=out_shape[1]) as dst:
-        dst.write(image, indexes=1)
-
-    return image

@@ -106,6 +106,7 @@ def get_files(dirname, extensions=['.png', '.tif', '.jpg']):
     match = [path.resolve() for path in files if path.suffix in extensions]
 
     assert len(match) > 0, logger.critical(f'No image files found in {dir_path.resolve()}')
+    logger.debug(f'Retrieved {len(match)} files from {dirname}')
 
     return match
 
@@ -249,6 +250,7 @@ def run_inference(loader, model_wrapper, write_output=False, mode='loc', return_
         return_dict[f'{model_wrapper.model_size}{mode}'] = results_list
 
 
+# Todo: Move this to raster_processing
 def check_data(images):
     """
     Check that our image pairs contain useful data. Note: This only check the first band of each file.
@@ -263,7 +265,9 @@ def check_data(images):
 
     return True
 
+
 def parse_args():
+
     parser = argparse.ArgumentParser(description='Create arguments for xView 2 handler.')
 
     parser.add_argument('--pre_directory', metavar='/path/to/pre/files/', type=Path, required=True, help='Directory containing pre-disaster imagery. This is searched recursively.')
@@ -287,6 +291,32 @@ def parse_args():
     return parser.parse_args()
 
 
+def pre_post_handler(args, pre_post):
+
+    if pre_post == 'pre':
+        crs_arg = args.pre_crs
+        directory = args.pre_directory
+    elif pre_post == 'post':
+        crs_arg = args.post_crs
+        directory = args.post_directory
+    else:
+        raise ValueError('pre_post must be either pre or post.')
+
+    crs = rasterio.crs.CRS.from_string(crs_arg) if crs_arg else None
+    files = get_files(directory)
+    df = utils.dataframe.make_footprint_df(files)
+
+    return files, crs, df
+
+
+def bldg_poly_handler(poly_file):
+
+    df = geopandas.read_file(poly_file)
+
+    return df
+
+
+
 @logger.catch()
 def main():
 
@@ -298,32 +328,11 @@ def main():
     # Make file structure
     make_output_structure(args.output_directory)
 
-    # Create input CRS objects from our pre/post inputs
-    if args.pre_crs:
-        args.pre_crs = rasterio.crs.CRS.from_string(args.pre_crs)
-    if args.post_crs:
-        args.post_crs = rasterio.crs.CRS.from_string(args.post_crs)
-
-    # Retrieve files form input directories
-    logger.info('Retrieving files...')
-    # Todo: add building polygon support
-    pre_files = get_files(args.pre_directory)
-    logger.debug(f'Retrieved {len(pre_files)} pre files from {args.pre_directory}')
-    post_files = get_files(args.post_directory)
-    logger.debug(f'Retrieved {len(post_files)} pre files from {args.post_directory}')
-
-    # Create VRTs
-    # Todo: Why are we doing this? 2022/03/07 -- unknown...for another day
-    pre_vrt = raster_processing.create_vrt(pre_files, args.output_directory.joinpath('vrt/pre_vrt.vrt'))
-    post_vrt = raster_processing.create_vrt(post_files, args.output_directory.joinpath('vrt/post_vrt.vrt'))
-
-    # Create geopandas dataframes of raster footprints
-    # Todo: make sure we have valid rasters before proceeding
-    pre_df = utils.dataframe.make_footprint_df(pre_files)
-    post_df = utils.dataframe.make_footprint_df(post_files)
+    # Create post df and determine crs
+    args.post_crs, post_files, post_df = pre_post_handler(args, 'post')
 
     # Create destination CRS object from argument, else determine UTM zone and create CRS object
-    dest_crs = utils.dataframe.get_utm(pre_df)
+    dest_crs = utils.dataframe.get_utm(post_df) # Use post so it doesn't break if we pass building polys
     logger.info(f'Calculated CRS: {dest_crs}')
 
     if args.destination_crs:
@@ -331,42 +340,77 @@ def main():
         logger.info(f'Calculated CRS overridden by passed argument: {args.destination_crs}')
     else:
         args.destination_crs = dest_crs
+
     # Ensure CRS is projected. This prevents a lot of problems downstream.
     assert args.destination_crs.is_projected, logger.critical('CRS is not projected. Please use a projected CRS')
 
-    # Process DF
-    pre_df = utils.dataframe.process_df(pre_df, args.destination_crs)
     post_df = utils.dataframe.process_df(post_df, args.destination_crs)
+
+    # Create pre df and determine crs if not bldg polys, if bldg polys, build df from bldg polys
+    if not args.bldg_polys:
+        args.pre_crs, pre_files, pre_df = pre_post_handler(args, 'pre')
+        pre_df = utils.dataframe.process_df(pre_df, args.destination_crs)
+    else:
+        pre_df = bldg_poly_handler(args.bldg_polys)
+    
+
+    # # Create input CRS objects from our pre/post inputs
+    # if args.pre_crs:
+    #     args.pre_crs = rasterio.crs.CRS.from_string(args.pre_crs)
+    # if args.post_crs:
+    #     args.post_crs = rasterio.crs.CRS.from_string(args.post_crs)
+
+    # # Todo: add building polygon support
+    # pre_files = get_files(args.pre_directory)  
+    # post_files = get_files(args.post_directory)
+
+    # Create VRTs
+    # Todo: Why are we doing this? 2022/03/07 -- unknown...for another day commented out 20220308 for building polygon support. Remove if works with vrt folder creation
+    # pre_vrt = raster_processing.create_vrt(pre_files, args.output_directory.joinpath('vrt/pre_vrt.vrt'))
+    # post_vrt = raster_processing.create_vrt(post_files, args.output_directory.joinpath('vrt/post_vrt.vrt'))
+
+    # Create geopandas dataframes of raster footprints
+    # Todo: make sure we have valid rasters before proceeding
+    # pre_df = utils.dataframe.make_footprint_df(pre_files)
+    # post_df = utils.dataframe.make_footprint_df(post_files)
+
+    # Create destination CRS object from argument, else determine UTM zone and create CRS object
+    # dest_crs = utils.dataframe.get_utm(post_df) # Use post so it doesn't break if we pass building polys
+    # logger.info(f'Calculated CRS: {dest_crs}')
+
+    # if args.destination_crs:
+    #     args.destination_crs = rasterio.crs.CRS.from_string(args.destination_crs)
+    #     logger.info(f'Calculated CRS overridden by passed argument: {args.destination_crs}')
+    # else:
+    #     args.destination_crs = dest_crs
+
+    # Ensure CRS is projected. This prevents a lot of problems downstream.
+    # assert args.destination_crs.is_projected, logger.critical('CRS is not projected. Please use a projected CRS')
+
+    # Process DF -- add's transforms to df
+    # pre_df = utils.dataframe.process_df(pre_df, args.destination_crs)
+    # post_df = utils.dataframe.process_df(post_df, args.destination_crs)
 
     # Get AOI files and calculate intersect
     if args.aoi_file:
         aoi_df = dataframe.make_aoi_df(args.aoi_file)
     else:
         aoi_df = None
+
     extent = utils.dataframe.get_intersect(pre_df, post_df, args, aoi_df)
     logger.info(f'Calculated extent: {extent}')
 
     # Calculate destination resolution
-    # Todo: add building polygon support
-    res = dataframe.get_max_res(pre_df, post_df)
+    if args.bldg_polys:
+        res = dataframe.get_max_res(post_df, post_df)
+    else:
+        res = dataframe.get_max_res(pre_df, post_df)
     logger.info(f'Calculated resolution: {res}')
 
     if args.output_resolution:
         res = (args.output_resolution, args.output_resolution)
         logger.info(f'Calculated resolution overridden by passed argument: {res}')
-
-    # Todo: add building polygon support
-    logger.info("Creating pre mosaic...")
-    pre_mosaic = raster_processing.create_mosaic(
-        [str(file) for file in pre_df.filename],
-        Path(f"{args.output_directory}/mosaics/pre.tif"),
-        pre_df.crs,
-        args.destination_crs,
-        extent,
-        res,
-        aoi_df
-    )
-
+    
     logger.info("Creating post mosaic...")
     post_mosaic = raster_processing.create_mosaic(
         [str(file) for file in post_df.filename],
@@ -377,6 +421,31 @@ def main():
         res,
         aoi_df
     )
+
+    if args.bldg_polys:
+        with rasterio.open(post_mosaic) as src:
+            out_shape = (src.height, src.width)
+            out_transform = src.transform
+        logger.info("Creating building polygon mosaic...")
+        pre_mosaic = dataframe.bldg_poly_process(
+                                                pre_df,
+                                                extent,
+                                                args.destination_crs,
+                                                Path(f"{args.output_directory}/mosaics/pre.tif"),
+                                                out_shape,
+                                                out_transform
+                                                )
+    else:
+        logger.info("Creating pre mosaic...")
+        pre_mosaic = raster_processing.create_mosaic(
+            [str(file) for file in pre_df.filename],
+            Path(f"{args.output_directory}/mosaics/pre.tif"),
+            pre_df.crs,
+            args.destination_crs,
+            extent,
+            res,
+            aoi_df
+        )
 
     logger.info('Chipping...')
     pre_chips = raster_processing.create_chips(pre_mosaic, args.output_directory.joinpath('chips').joinpath('pre'), extent)
