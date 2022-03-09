@@ -27,7 +27,7 @@ class XViewDataset(Dataset):
 
     def __getitem__(self, idx, return_img=False):
         fl = self.pairs[idx]
-
+        print(fl)
         pre_image = np.array(Image.open(str(fl.opts.in_pre_path)).convert('RGB'))
         post_image = np.array(Image.open(str(fl.opts.in_post_path)).convert('RGB'))
 
