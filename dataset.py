@@ -29,6 +29,7 @@ class XViewDataset(Dataset):
         fl = self.pairs[idx]
 
         # Todo: Change to Rasterio to reduce OpenCV dependency (always a problem with environments, at least with Conda)
+        logger.trace(f'Data loader -- fl.opts: {fl.opts}')
         pre_image = Image.open(str(fl.opts.in_pre_path)).convert('RGB')
         post_image = Image.open(str(fl.opts.in_post_path)).convert('RGB')
 
