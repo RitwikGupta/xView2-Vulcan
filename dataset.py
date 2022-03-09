@@ -10,7 +10,7 @@ import numpy as np
 class XViewDataset(Dataset):
     "Dataset for xView"
 
-    def __init__(self, pairs, mode, return_geo=False):
+    def __init__(self, pairs, mode, bldg_polys, return_geo=False):
         """
         :param pre_chips: List of pre-damage chip filenames
         :param post_chips: List of post_damage chip filenames
@@ -19,6 +19,7 @@ class XViewDataset(Dataset):
         self.pairs = pairs
         self.return_geo=return_geo
         self.mode = mode
+        self.bldg_polys = bldg_polys
 
 
     def __len__(self):
@@ -28,11 +29,11 @@ class XViewDataset(Dataset):
         fl = self.pairs[idx]
 
         pre_image = cv2.imread(str(fl.opts.in_pre_path), cv2.IMREAD_COLOR)
-        if args.bldg_polys:
+        if self.bldg_polys:
             pre_image = cv2.cvtColor(pre_image,cv2.COLOR_GRAY2RGB)
 
         post_image = cv2.imread(str(fl.opts.in_post_path), cv2.IMREAD_COLOR)
-        
+
         if self.mode == 'cls':
             img = np.concatenate([pre_image, post_image], axis=2)
         elif self.mode == 'loc':

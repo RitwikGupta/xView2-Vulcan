@@ -436,14 +436,14 @@ def main():
             post)
             )
     
-    eval_loc_dataset = XViewDataset(pairs, 'loc')
+    eval_loc_dataset = XViewDataset(pairs, 'loc', args.bldg_polys)
     eval_loc_dataloader = DataLoader(eval_loc_dataset, 
                                      batch_size=args.batch_size, 
                                      num_workers=args.num_workers,
                                      shuffle=False,
                                      pin_memory=True)
     
-    eval_cls_dataset = XViewDataset(pairs, 'cls')
+    eval_cls_dataset = XViewDataset(pairs, 'cls', args.bldg_polys)
     eval_cls_dataloader = DataLoader(eval_cls_dataset, 
                                      batch_size=args.batch_size,
                                      num_workers=args.num_workers,
