@@ -460,7 +460,7 @@ def main():
             
             return_dict = {}
                 
-            if args.bldg_polys:
+            if not args.bldg_polys:
                 loc_wrapper = XViewFirstPlaceLocModel(sz, dp_mode=args.dp_mode)
 
                 run_inference(eval_loc_dataloader,
