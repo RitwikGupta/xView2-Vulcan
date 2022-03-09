@@ -127,7 +127,7 @@ def reproject_helper(args, raster_tuple, procnum, return_dict, resolution):
         return None
 
 
-def postprocess_and_write(result_dict):
+def postprocess_and_write(result_dict, bldg_polys=None):
     """
     Postprocess results from inference and write results to file
     :param result_dict: dictionary containing all required opts for each example
@@ -147,8 +147,10 @@ def postprocess_and_write(result_dict):
     
     preds = np.asarray(preds).astype('float').sum(axis=0) / np.sum(pred_coefs) / 255
     msk_dmg = preds[..., 1:].argmax(axis=2) + 1
+
     
-    if args.bldg_polys:
+    
+    if bldg_polys:
         with rasterio.open(v['in_pre_path']) as src:
             msk_loc = src.read(1)
     else:
@@ -159,10 +161,10 @@ def postprocess_and_write(result_dict):
                 _i += 1
                 msk = v['loc'].numpy()
                 loc_preds.append(msk * loc_coefs[_i])
+            
+            loc_preds = np.asarray(loc_preds).astype('float').sum(axis=0) / np.sum(loc_coefs) / 255
+            msk_loc = (1 * ((loc_preds > _thr[0]) | ((loc_preds > _thr[1]) & (msk_dmg > 1) & (msk_dmg < 4)) | ((loc_preds > _thr[2]) & (msk_dmg > 1)))).astype('uint8')
         
-        loc_preds = np.asarray(loc_preds).astype('float').sum(axis=0) / np.sum(loc_coefs) / 255
-        msk_loc = (1 * ((loc_preds > _thr[0]) | ((loc_preds > _thr[1]) & (msk_dmg > 1) & (msk_dmg < 4)) | ((loc_preds > _thr[2]) & (msk_dmg > 1)))).astype('uint8')
-    
     msk_dmg = msk_dmg * msk_loc
     _msk = (msk_dmg == 2)
     if _msk.sum() > 0:
@@ -609,7 +611,9 @@ def main():
     p = mp.Pool(args.n_procs)
     #postprocess_and_write(results_list[0])
     f_p = postprocess_and_write
-    p.map(f_p, results_list)
+
+    results = [(results, args.bldg_polys) for results in results_list]
+    p.starmap(f_p, results)
 
     # Create damage and overlay mosaics
     logger.info("Creating damage mosaic")
