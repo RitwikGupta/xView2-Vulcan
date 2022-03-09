@@ -1,4 +1,4 @@
-import cv2
+from PIL import Image
 import os
 from skimage.io import imread
 import tifffile
@@ -29,8 +29,8 @@ class XViewDataset(Dataset):
         fl = self.pairs[idx]
 
         # Todo: Change to Rasterio to reduce OpenCV dependency (always a problem with environments, at least with Conda)
-        pre_image = cv2.imread(str(fl.opts.in_pre_path), cv2.IMREAD_COLOR)
-        post_image = cv2.imread(str(fl.opts.in_post_path), cv2.IMREAD_COLOR)
+        pre_image = Image.open(str(fl.opts.in_pre_path)).convert('RGB')
+        post_image = Image.open(str(fl.opts.in_post_path)).convert('RGB')
 
         if self.mode == 'cls':
             img = np.concatenate([pre_image, post_image], axis=2)
