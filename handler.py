@@ -146,19 +146,22 @@ def postprocess_and_write(result_dict):
             preds.append(msk * pred_coefs[_i])
     
     preds = np.asarray(preds).astype('float').sum(axis=0) / np.sum(pred_coefs) / 255
-    
-    loc_preds = []
-    _i = -1
-    for k,v in result_dict.items():
-        if 'loc' in k:
-            _i += 1
-            msk = v['loc'].numpy()
-            loc_preds.append(msk * loc_coefs[_i])
-    
-    loc_preds = np.asarray(loc_preds).astype('float').sum(axis=0) / np.sum(loc_coefs) / 255
-    
     msk_dmg = preds[..., 1:].argmax(axis=2) + 1
-    msk_loc = (1 * ((loc_preds > _thr[0]) | ((loc_preds > _thr[1]) & (msk_dmg > 1) & (msk_dmg < 4)) | ((loc_preds > _thr[2]) & (msk_dmg > 1)))).astype('uint8')
+    
+    if args.bldg_polys:
+        with rasterio.open(v['in_pre_path']) as src:
+            msk_loc = src.read(1)
+    else:
+        loc_preds = []
+        _i = -1
+        for k,v in result_dict.items():
+            if 'loc' in k:
+                _i += 1
+                msk = v['loc'].numpy()
+                loc_preds.append(msk * loc_coefs[_i])
+        
+        loc_preds = np.asarray(loc_preds).astype('float').sum(axis=0) / np.sum(loc_coefs) / 255
+        msk_loc = (1 * ((loc_preds > _thr[0]) | ((loc_preds > _thr[1]) & (msk_dmg > 1) & (msk_dmg < 4)) | ((loc_preds > _thr[2]) & (msk_dmg > 1)))).astype('uint8')
     
     msk_dmg = msk_dmg * msk_loc
     _msk = (msk_dmg == 2)
@@ -171,7 +174,7 @@ def postprocess_and_write(result_dict):
     loc = msk_loc
     cls = msk_dmg
     
-    sample_result_dict = result_dict['34loc']
+    sample_result_dict = result_dict['34loc']  # Todo: update this to a cls key for use in bldg_polys
     sample_result_dict['geo_profile'].update(dtype=rasterio.uint8)
 
     dst = rasterio.open(sample_result_dict['out_loc_path'], 'w', **sample_result_dict['geo_profile'])
@@ -200,11 +203,7 @@ def run_inference(loader, model_wrapper, write_output=False, mode='loc', return_
             #    import ipdb; ipdb.set_trace()
             #    debug=True
 
-            
-            if args.bldg_polys and mode == 'loc':
-                out = result_dict['img']
-            else:
-                out = model_wrapper.forward(result_dict['img'],debug=debug)
+            out = model_wrapper.forward(result_dict['img'],debug=debug)
 
             # Save prediction tensors for testing
             # Todo: Create argument for turning on debug/trace/test data
@@ -354,44 +353,6 @@ def main():
         pre_df = utils.dataframe.process_df(pre_df, args.destination_crs)
     else:
         pre_df = dataframe.bldg_poly_handler(args.bldg_polys)
-    
-
-    # # Create input CRS objects from our pre/post inputs
-    # if args.pre_crs:
-    #     args.pre_crs = rasterio.crs.CRS.from_string(args.pre_crs)
-    # if args.post_crs:
-    #     args.post_crs = rasterio.crs.CRS.from_string(args.post_crs)
-
-    # # Todo: add building polygon support
-    # pre_files = get_files(args.pre_directory)  
-    # post_files = get_files(args.post_directory)
-
-    # Create VRTs
-    # Todo: Why are we doing this? 2022/03/07 -- unknown...for another day commented out 20220308 for building polygon support. Remove if works with vrt folder creation
-    # pre_vrt = raster_processing.create_vrt(pre_files, args.output_directory.joinpath('vrt/pre_vrt.vrt'))
-    # post_vrt = raster_processing.create_vrt(post_files, args.output_directory.joinpath('vrt/post_vrt.vrt'))
-
-    # Create geopandas dataframes of raster footprints
-    # Todo: make sure we have valid rasters before proceeding
-    # pre_df = utils.dataframe.make_footprint_df(pre_files)
-    # post_df = utils.dataframe.make_footprint_df(post_files)
-
-    # Create destination CRS object from argument, else determine UTM zone and create CRS object
-    # dest_crs = utils.dataframe.get_utm(post_df) # Use post so it doesn't break if we pass building polys
-    # logger.info(f'Calculated CRS: {dest_crs}')
-
-    # if args.destination_crs:
-    #     args.destination_crs = rasterio.crs.CRS.from_string(args.destination_crs)
-    #     logger.info(f'Calculated CRS overridden by passed argument: {args.destination_crs}')
-    # else:
-    #     args.destination_crs = dest_crs
-
-    # Ensure CRS is projected. This prevents a lot of problems downstream.
-    # assert args.destination_crs.is_projected, logger.critical('CRS is not projected. Please use a projected CRS')
-
-    # Process DF -- add's transforms to df
-    # pre_df = utils.dataframe.process_df(pre_df, args.destination_crs)
-    # post_df = utils.dataframe.process_df(post_df, args.destination_crs)
 
     # Get AOI files and calculate intersect
     if args.aoi_file:
@@ -428,6 +389,7 @@ def main():
         with rasterio.open(post_mosaic) as src:
             out_shape = (src.height, src.width)
             out_transform = src.transform
+
         logger.info("Creating building polygon mosaic...")
         pre_mosaic = dataframe.bldg_poly_process(
                                                 pre_df,
@@ -493,16 +455,19 @@ def main():
 
         for sz in ['34', '50', '92', '154']:
             logger.info(f'Running models of size {sz}...')
+            
             return_dict = {}
-            loc_wrapper = XViewFirstPlaceLocModel(sz, dp_mode=args.dp_mode)
+                
+            if args.bldg_polys:
+                loc_wrapper = XViewFirstPlaceLocModel(sz, dp_mode=args.dp_mode)
 
-            run_inference(eval_loc_dataloader,
-                                loc_wrapper,
-                                args.save_intermediates,
-                                'loc',
-                                return_dict)
+                run_inference(eval_loc_dataloader,
+                                    loc_wrapper,
+                                    args.save_intermediates,
+                                    'loc',
+                                    return_dict)
 
-            del loc_wrapper
+                del loc_wrapper
 
             cls_wrapper = XViewFirstPlaceClsModel(sz, dp_mode=args.dp_mode)
 
