@@ -28,10 +28,8 @@ class XViewDataset(Dataset):
     def __getitem__(self, idx, return_img=False):
         fl = self.pairs[idx]
 
-        # Todo: Change to Rasterio to reduce OpenCV dependency (always a problem with environments, at least with Conda)
-        logger.trace(f'Data loader -- fl.opts: {fl.opts}')
-        pre_image = Image.open(str(fl.opts.in_pre_path)).convert('RGB')
-        post_image = Image.open(str(fl.opts.in_post_path)).convert('RGB')
+        pre_image = np.array(Image.open(str(fl.opts.in_pre_path)).convert('RGB'))
+        post_image = np.array(Image.open(str(fl.opts.in_post_path)).convert('RGB'))
 
         if self.mode == 'cls':
             img = np.concatenate([pre_image, post_image], axis=2)
