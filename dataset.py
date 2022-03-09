@@ -32,6 +32,7 @@ class XViewDataset(Dataset):
         pre_image = cv2.imread(str(fl.opts.in_pre_path), cv2.IMREAD_COLOR)
         logger.trace(f'Pre image shape before GRAY2RGB: {pre_image.shape}')
         if self.bldg_polys:
+            logger.trace(pre_image)
             pre_image = cv2.cvtColor(pre_image,cv2.COLOR_GRAY2RGB)
             logger.trace(f'Pre image shape after GRAY2RGB: {pre_image.shape}')
         post_image = cv2.imread(str(fl.opts.in_post_path), cv2.IMREAD_COLOR)
