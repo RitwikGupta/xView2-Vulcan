@@ -11,7 +11,7 @@ from loguru import logger
 class XViewDataset(Dataset):
     "Dataset for xView"
 
-    def __init__(self, pairs, mode, bldg_polys, return_geo=False):
+    def __init__(self, pairs, mode, return_geo=False):
         """
         :param pre_chips: List of pre-damage chip filenames
         :param post_chips: List of post_damage chip filenames
@@ -20,7 +20,6 @@ class XViewDataset(Dataset):
         self.pairs = pairs
         self.return_geo=return_geo
         self.mode = mode
-        self.bldg_polys = bldg_polys
 
 
     def __len__(self):
@@ -29,12 +28,8 @@ class XViewDataset(Dataset):
     def __getitem__(self, idx, return_img=False):
         fl = self.pairs[idx]
 
+        # Todo: Change to Rasterio to reduce OpenCV dependency (always a problem with environments, at least with Conda)
         pre_image = cv2.imread(str(fl.opts.in_pre_path), cv2.IMREAD_COLOR)
-        logger.trace(f'Pre image shape before GRAY2RGB: {pre_image.shape}')
-        if self.bldg_polys:
-            logger.trace(pre_image)
-            pre_image = cv2.cvtColor(pre_image,cv2.COLOR_GRAY2RGB)
-            logger.trace(f'Pre image shape after GRAY2RGB: {pre_image.shape}')
         post_image = cv2.imread(str(fl.opts.in_post_path), cv2.IMREAD_COLOR)
 
         if self.mode == 'cls':
