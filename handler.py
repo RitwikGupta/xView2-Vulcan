@@ -680,8 +680,9 @@ def init():
     logger.remove()
     logger.configure(
         handlers=[
-            dict(sink=sys.stderr, format="[{level}] {message}", level='INFO'),
-            dict(sink=args.output_directory / 'log'/ f'xv2.log', enqueue=True, level='DEBUG', backtrace=True),
+            # Todo: Allow for argument to change log level
+            dict(sink=sys.stderr, format="[{level}] {message}", level='TRACE'),
+            dict(sink=args.output_directory / 'log'/ f'xv2.log', enqueue=True, level='TRACE', backtrace=True),
         ],
     )
     logger.opt(exception=True)
