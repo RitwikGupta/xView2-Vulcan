@@ -73,9 +73,7 @@ def create_mosaic(in_data, out_file, src_crs=None, dst_crs=None, extent=None, ds
             f.seek(0)
             aoi = f.read().decode()
 
-    temp_out = Path(out_file.stem + '_temp.tif')
-
-    reproj = gdal.Warp(str(temp_out),
+    reproj = gdal.Warp(str(out_file),
                        in_data,
                        srcSRS=src_crs,
                        format='GTiff',
@@ -88,10 +86,6 @@ def create_mosaic(in_data, out_file, src_crs=None, dst_crs=None, extent=None, ds
                        # Todo: Apparently crop will grew it the the size of the cutline dataset. So if is bigger than the raster it pads it
                        multithread=True
     )
-
-    # Remove alpha channel
-    gdal.Translate(str(out_file), str(temp_out), bandList=[1, 2, 3])
-    temp_out.unlink()
 
     return out_file
 
@@ -209,7 +203,6 @@ def create_composite(base, overlay, out_file, transforms, alpha=.6):
     pre_img.putalpha(255)
 
     comp = Image.alpha_composite(pre_img, over_img)
-
     comp_arr = np.asarray(comp)
     no_alpha = comp_arr[:,:,:3]
 

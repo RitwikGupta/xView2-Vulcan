@@ -239,7 +239,6 @@ class TestIntegration:
         ('mosaics/damage.tif'),
         ('mosaics/overlay.tif'),
         ('vector/damage.gpkg'),
-        ('vector/damage.geojson'),
         ('log/xv2.log')
     ])
     def test_is_files(self, setup, output_path, file):
