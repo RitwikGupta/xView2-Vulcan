@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 from torch.backends import cudnn
 from torch.autograd import Variable
+import segmentation_models_pytorch as smp
 
 from os import path, makedirs, listdir
 from zoo.models import *
@@ -137,3 +138,55 @@ class XViewFirstPlaceClsModel(XViewFirstPlaceLocModel):
         self.load_models()
 
 
+class MicrosoftPlanetModel(nn.Module):
+    def __init__(self, models_folder='weights', devices=[0],
+                 checkpoint_name='msft.ckpt', load_models=True, dp_mode=False):
+        super(MicrosoftPlanetModel, self).__init__()
+        self.model = None
+        self.dp_mode = dp_mode
+        self.models_folder = models_folder
+        self.devices = devices
+        self.checkpoint_name = checkpoint_name
+        # Allows subclassing without loading models twice
+        if load_models:
+            self.load_models()
+
+    def load_models(self):
+        self.model = smp.Unet(
+                        encoder_name="resnet18",
+                        encoder_weights=None,
+                        in_channels=3,
+                        classes=4,
+                    )
+        checkpoint = torch.load("weights/msft.ckpt", map_location="cpu")
+        state_dict = {k.replace("model.", ""): v for k,v in checkpoint["state_dict"].items()}
+        self.model.load_state_dict(state_dict)
+        self.model.eval()
+
+
+    def execute_model(self, x):
+        model_device = next(self.model.parameters()).device # Hack to get device
+        inp = Variable(x).to(model_device)
+        msk = self.model(inp)
+        return msk
+
+
+    def forward(self,x, debug=False):
+        if debug:
+            import ipdb; ipdb.set_trace()
+        b, h, w, c = x.shape
+
+        # BHWC -> BCHW
+        x = torch.permute(x, (0, 3, 1, 2))
+
+        msk = self.model(x)
+
+        # The shape of the output according to Microsoft
+        # Dim 1 output spec:
+        # 0 -- no data
+        # 1 -- background
+        # 2 -- building
+        # 3 -- damage
+        assert msk.shape == (b, 4, h, w)
+
+        return msk

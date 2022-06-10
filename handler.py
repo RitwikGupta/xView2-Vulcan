@@ -18,8 +18,8 @@ from pathlib import Path
 from torch.utils.data import DataLoader
 from skimage.morphology import square, dilation
 from tqdm import tqdm
-from dataset import XViewDataset
-from models import XViewFirstPlaceLocModel, XViewFirstPlaceClsModel
+from dataset import XViewDataset, XViewMicrosoftDataset
+from models import MicrosoftPlanetModel, XViewFirstPlaceLocModel, XViewFirstPlaceClsModel
 from loguru import logger
 from osgeo import gdal
 import shapely
@@ -164,9 +164,6 @@ def postprocess_and_write(result_dict):
     Postprocess results from inference and write results to file
     :param result_dict: dictionary containing all required opts for each example
     """
-    _thr = [0.38, 0.13, 0.14]
-    pred_coefs = [1.0] * 4  # not 12, b/c already took mean over 3 in each subset
-    loc_coefs = [1.0] * 4
 
     preds = []
     _i = -1
@@ -175,32 +172,13 @@ def postprocess_and_write(result_dict):
             _i += 1
             # Todo: I think the below can just be replaced by v['cls'] -- should check
             msk = v["cls"].numpy()
-            preds.append(msk * pred_coefs[_i])
+            preds.append(msk)
 
-    preds = np.asarray(preds).astype("float").sum(axis=0) / np.sum(pred_coefs) / 255
-    msk_dmg = preds[..., 1:].argmax(axis=2) + 1
+    preds = np.asarray(preds).astype("float").sum(axis=0)
+    msk_dmg = preds.argmax(axis=1)
+    print(msk_dmg.shape)
 
-    if v["poly_chip"] == "None":  # Must be a string or PyTorch throws an error
-        loc_preds = []
-        _i = -1
-        for k, v in result_dict.items():
-            if "loc" in k:
-                _i += 1
-                msk = v["loc"].numpy()
-                loc_preds.append(msk * loc_coefs[_i])
-
-        loc_preds = (
-            np.asarray(loc_preds).astype("float").sum(axis=0) / np.sum(loc_coefs) / 255
-        )
-        msk_loc = (
-            1
-            * (
-                (loc_preds > _thr[0])
-                | ((loc_preds > _thr[1]) & (msk_dmg > 1) & (msk_dmg < 4))
-                | ((loc_preds > _thr[2]) & (msk_dmg > 1))
-            )
-        ).astype("uint8")
-    else:
+    if v["poly_chip"] != "None":  # Must be a string or PyTorch throws an error
         msk_loc = rasterio.open(v["poly_chip"]).read(1)
 
     msk_dmg = msk_dmg * msk_loc
@@ -324,7 +302,7 @@ def run_inference(
     if return_dict is None:
         return results_list
     else:
-        return_dict[f"{model_wrapper.model_size}{mode}"] = results_list
+        return_dict[f"{mode}"] = results_list
 
 
 # Todo: Move this to raster_processing
@@ -591,7 +569,7 @@ def main():
             )
         )
 
-    eval_loc_dataset = XViewDataset(pairs, "loc")
+    eval_loc_dataset = XViewMicrosoftDataset(pairs, "loc")
     eval_loc_dataloader = DataLoader(
         eval_loc_dataset,
         batch_size=args.batch_size,
@@ -600,7 +578,7 @@ def main():
         pin_memory=True,
     )
 
-    eval_cls_dataset = XViewDataset(pairs, "cls")
+    eval_cls_dataset = XViewMicrosoftDataset(pairs, "cls")
     eval_cls_dataloader = DataLoader(
         eval_cls_dataset,
         batch_size=args.batch_size,
@@ -609,168 +587,23 @@ def main():
         pin_memory=True,
     )
 
-    # Todo: If on a one GPU machine (or other unsupported GPU count), force DP mode
-    if torch.cuda.device_count() == 1:
-        args.dp_mode = True
-        logger.info("Single CUDA device found. Forcing DP mode")
+    return_dict = {}
+    results_dict = {}
 
-    # Inference in DP mode
-    if args.dp_mode:
-        results_dict = {}
+    cls_model = MicrosoftPlanetModel()
+    run_inference(
+        eval_cls_dataloader,
+        cls_model,
+        args.save_intermediates,
+        "cls",
+        return_dict
+    )
 
-        for sz in ["34", "50", "92", "154"]:
-            logger.info(f"Running models of size {sz}...")
-
-            return_dict = {}
-            loc_wrapper = XViewFirstPlaceLocModel(sz, dp_mode=args.dp_mode)
-
-            if not args.bldg_polys:
-                run_inference(
-                    eval_loc_dataloader,
-                    loc_wrapper,
-                    args.save_intermediates,
-                    "loc",
-                    return_dict,
-                )
-
-            del loc_wrapper
-
-            cls_wrapper = XViewFirstPlaceClsModel(sz, dp_mode=args.dp_mode)
-
-            run_inference(
-                eval_cls_dataloader,
-                cls_wrapper,
-                args.save_intermediates,
-                "cls",
-                return_dict,
-            )
-
-            del cls_wrapper
-
-            results_dict.update({k: v for k, v in return_dict.items()})
-
-    else:
-        if torch.cuda.device_count() == 2:
-            # For 2-GPU machines [TESTED]
-
-            # Loading model
-            loc_gpus = {
-                "34": [0, 0, 0],
-                "50": [1, 1, 1],
-                "92": [0, 0, 0],
-                "154": [1, 1, 1],
-            }
-
-            cls_gpus = {
-                "34": [1, 1, 1],
-                "50": [0, 0, 0],
-                "92": [1, 1, 1],
-                "154": [0, 0, 0],
-            }
-
-        elif torch.cuda.device_count() == 4:
-            # For 4-GPU machines [ Todo: Test ]
-
-            # Loading model
-            loc_gpus = {
-                "34": [0, 0, 0],
-                "50": [1, 1, 1],
-                "92": [2, 2, 2],
-                "154": [3, 3, 3],
-            }
-
-            cls_gpus = {
-                "34": [0, 0, 0],
-                "50": [1, 1, 1],
-                "92": [2, 2, 2],
-                "154": [3, 3, 3],
-            }
-
-        elif torch.cuda.device_count() == 8:
-            # For 8-GPU machines
-
-            # Loading model
-            loc_gpus = {
-                "34": [0, 0, 0],
-                "50": [1, 1, 1],
-                "92": [2, 2, 2],
-                "154": [3, 3, 3],
-            }
-
-            cls_gpus = {
-                "34": [4, 4, 4],
-                "50": [5, 5, 5],
-                "92": [6, 6, 6],
-                "154": [7, 7, 7],
-            }
-
-        else:
-            raise ValueError(
-                "Unsupported number of GPUs. Please use a 1, 2, 4, or 8 GPUs."
-            )
-
-        results_dict = {}
-
-        # Running inference
-        logger.info("Running inference...")
-
-        for sz in loc_gpus.keys():
-            logger.info(f"Running models of size {sz}...")
-            loc_wrapper = XViewFirstPlaceLocModel(sz, devices=loc_gpus[sz])
-            cls_wrapper = XViewFirstPlaceClsModel(sz, devices=cls_gpus[sz])
-
-            # Running inference
-            logger.info("Running inference...")
-
-            # Run inference in parallel processes
-            manager = mp.Manager()
-            return_dict = manager.dict()
-            jobs = []
-
-            # Launch multiprocessing jobs for different pytorch jobs
-            p1 = mp.Process(
-                target=run_inference,
-                args=(
-                    eval_cls_dataloader,
-                    cls_wrapper,
-                    args.save_intermediates,
-                    "cls",
-                    return_dict,
-                ),
-            )
-            p2 = mp.Process(
-                target=run_inference,
-                args=(
-                    eval_loc_dataloader,
-                    loc_wrapper,
-                    args.save_intermediates,
-                    "loc",
-                    return_dict,
-                ),
-            )
-            p1.start()
-
-            if not args.bldg_polys:
-                p2.start()
-
-            jobs.append(p1)
-
-            if not args.bldg_polys:
-                jobs.append(p2)
-
-            for proc in jobs:
-                proc.join()
-
-            results_dict.update({k: v for k, v in return_dict.items()})
-
-        raise ValueError(logger.critical("Must use either 2, 4, or 8 GPUs."))
-
-    # Quick check to make sure the samples in cls and loc are in the same order
-    # assert(results_dict['34loc'][4]['in_pre_path'] == results_dict['34cls'][4]['in_pre_path'])
+    results_dict.update({k: v for k, v in return_dict.items()})
 
     results_list = [
         {k: v[i] for k, v in results_dict.items()}
-        for i in range(len(results_dict["34cls"]))
+        for i in range(len(results_dict["cls"]))
     ]
 
     # Running postprocessing

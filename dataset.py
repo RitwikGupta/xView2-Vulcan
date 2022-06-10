@@ -5,13 +5,6 @@ import numpy as np
 from PIL import Image
 
 
-def preprocess_inputs(x):
-    x = np.asarray(x, dtype="float32")
-    x /= 127
-    x -= 1
-    return x
-
-
 class XViewDataset(Dataset):
     "Dataset for xView"
 
@@ -39,7 +32,7 @@ class XViewDataset(Dataset):
         else:
             raise ValueError("Incorrect mode!  Must be cls or loc")
 
-        img = preprocess_inputs(img)
+        img = self.preprocess_inputs(img)
 
         inp = []
         inp.append(img)
@@ -64,3 +57,54 @@ class XViewDataset(Dataset):
         out_dict["is_vis"] = fl.opts.is_vis
 
         return out_dict
+
+    def preprocess_inputs(self, x):
+        x = np.asarray(x, dtype="float32")
+        x /= 127
+        x -= 1
+        return x
+
+class XViewMicrosoftDataset(Dataset):
+    "Dataset for xView"
+
+    def __init__(self, pairs, mode, return_geo=False):
+        """
+        :param pre_chips: List of pre-damage chip filenames
+        :param post_chips: List of post_damage chip filenames
+        :param transform: PyTorch transforms to be used on each example
+        """
+        self.pairs = pairs
+        self.return_geo = return_geo
+        self.mode = mode
+
+    def __len__(self):
+        return len(self.pairs)
+
+    def __getitem__(self, idx, return_img=False):
+        fl = self.pairs[idx]
+        img = np.array(Image.open(str(fl.opts.in_post_path)).convert("RGB"))
+
+        img = self.preprocess_inputs(img)
+
+        inp = torch.from_numpy(img).float()
+
+        out_dict = {}
+        out_dict["in_pre_path"] = str(fl.opts.in_pre_path)
+        out_dict["in_post_path"] = str(fl.opts.in_post_path)
+        out_dict["poly_chip"] = str(fl.opts.poly_chip)
+        if return_img:
+            out_dict["pre_image"] = None
+            out_dict["post_image"] = img
+        out_dict["img"] = inp
+        out_dict["idx"] = idx
+        out_dict["out_cls_path"] = str(fl.opts.out_cls_path)
+        out_dict["out_loc_path"] = str(fl.opts.out_loc_path)
+        out_dict["out_overlay_path"] = str(fl.opts.out_overlay_path)
+        out_dict["is_vis"] = fl.opts.is_vis
+
+        return out_dict
+
+    def preprocess_inputs(self, x):
+        x = np.asarray(x, dtype="float32")
+        x /= 255.0
+        return x
