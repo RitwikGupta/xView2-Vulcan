@@ -189,12 +189,8 @@ class MicrosoftPlanetModel(nn.Module):
         # 3 -- damage
         assert msk.shape == (b, 4, h, w)
 
-        print(f'Mask shape before changes: {msk.shape}')
-
         msk = msk.argmax(axis=1)
         msk = torch.unsqueeze(msk, axis=1)
         msk = torch.permute(msk, (0, 2, 3, 1))
-
-        print(f'Mask shape after changes: {msk.shape}')
 
         return msk

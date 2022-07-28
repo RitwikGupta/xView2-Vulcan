@@ -589,7 +589,7 @@ def main():
     return_dict = {}
     results_dict = {}
 
-    cls_model = MicrosoftPlanetModel()
+    cls_model = MicrosoftPlanetModel(checkpoint_name='msft-3.ckpt')
     run_inference(
         eval_cls_dataloader,
         cls_model,
