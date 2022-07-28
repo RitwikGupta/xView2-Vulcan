@@ -763,8 +763,6 @@ def main():
 
             results_dict.update({k: v for k, v in return_dict.items()})
 
-        raise ValueError(logger.critical("Must use either 2, 4, or 8 GPUs."))
-
     # Quick check to make sure the samples in cls and loc are in the same order
     # assert(results_dict['34loc'][4]['in_pre_path'] == results_dict['34cls'][4]['in_pre_path'])
 
@@ -790,11 +788,17 @@ def main():
         polygons = features.create_polys(dmg_files)
 
     if args.bldg_polys:
-        polygons = in_poly_df.reset_index().overlay(polygons, how="identity").clip(extent, keep_geom_type=True) # reset_index preserves a column independent id for joining later
+        polygons = (
+            in_poly_df.reset_index()
+            .overlay(polygons, how="identity")
+            .clip(extent, keep_geom_type=True)
+        )  # reset_index preserves a column independent id for joining later
         polygons = (
             polygons.groupby("index", as_index=False)
             .apply(lambda x: features.weight_dmg(x, args.destination_crs))
-            .reset_index(drop=True) # resets multi-index created during grouping/dissolve process
+            .reset_index(
+                drop=True
+            )  # resets multi-index created during grouping/dissolve process
         )
         polygons.set_crs(args.destination_crs)
 
