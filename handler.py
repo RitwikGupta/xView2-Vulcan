@@ -5,6 +5,8 @@ import os
 import sys
 import multiprocessing as mp
 
+from cv2 import sort
+
 mp.set_start_method("spawn", force=True)
 import utils.dataframe
 import numpy as np
@@ -165,26 +167,13 @@ def postprocess_and_write(result_dict):
     :param result_dict: dictionary containing all required opts for each example
     """
 
-    preds = []
-    _i = -1
-    for k, v in result_dict.items():
-        if "cls" in k:
-            _i += 1
-            # Todo: I think the below can just be replaced by v['cls'] -- should check
-            msk = v["cls"].numpy()
-            preds.append(msk)
+    msk_dmg = result_dict["cls"]["cls"].numpy()
 
-    preds = np.asarray(preds).astype("float").sum(axis=0)
-    msk_dmg = preds.argmax(axis=1)
-
-    if v["poly_chip"] != "None":  # Must be a string or PyTorch throws an error
-        msk_loc = rasterio.open(v["poly_chip"]).read(1)
+    if result_dict["cls"]["poly_chip"] != "None":  # Must be a string or PyTorch throws an error
+        msk_loc = rasterio.open(result_dict["cls"]["poly_chip"]).read(1)
 
     msk_dmg = msk_dmg * msk_loc
-    _msk = msk_dmg == 2
-    if _msk.sum() > 0:
-        _msk = dilation(_msk, square(5))
-        msk_dmg[_msk & msk_dmg == 1] = 2
+    #_msk = msk_dmg == 3
 
     msk_dmg = msk_dmg.astype("uint8")
 
@@ -221,13 +210,8 @@ def run_inference(
     results = defaultdict(list)
     with torch.no_grad():  # This is really important to not explode memory with gradients!
         for ii, result_dict in tqdm(enumerate(loader), total=len(loader)):
-            # print(result_dict['in_pre_path'])
             debug = False
-            # if '116' in result_dict['in_pre_path'][0]:
-            #    import ipdb; ipdb.set_trace()
-            #    debug=True
-
-            out = model_wrapper.forward(result_dict["img"], debug=debug)
+            out = model_wrapper(result_dict["img"])
 
             # Save prediction tensors for testing
             # Todo: Create argument for turning on debug/trace/test data
@@ -236,6 +220,8 @@ def run_inference(
             # torch.save(out, pred_path / f'preds_{mode}_{ii}.pt')
 
             out = out.detach().cpu()
+            if out.shape[3] == 1:
+                out = out.squeeze(axis=3)
 
             del result_dict["img"]
 
@@ -549,6 +535,10 @@ def main():
     assert len(pre_chips) == len(post_chips), logger.error(
         "Chip numbers mismatch (pre/post"
     )
+
+    pre_chips = sorted(pre_chips)
+    post_chips = sorted(post_chips)
+    poly_chips = sorted(poly_chips)
 
     # Defining dataset and dataloader
     pairs = []

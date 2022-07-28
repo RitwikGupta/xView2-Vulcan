@@ -158,7 +158,7 @@ class MicrosoftPlanetModel(nn.Module):
                         in_channels=3,
                         classes=4,
                     )
-        checkpoint = torch.load("weights/msft.ckpt", map_location="cpu")
+        checkpoint = torch.load(f"weights/{self.checkpoint_name}", map_location="cpu")
         state_dict = {k.replace("model.", ""): v for k,v in checkpoint["state_dict"].items()}
         self.model.load_state_dict(state_dict)
         self.model.eval()

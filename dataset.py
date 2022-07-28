@@ -87,7 +87,7 @@ class XViewMicrosoftDataset(Dataset):
 
     def __getitem__(self, idx, return_img=False):
         fl = self.pairs[idx]
-        img = np.array(Image.open(str(fl.opts.in_post_path)).convert("RGB"))
+        img = np.array(Image.open(str(fl.opts.in_post_path)))
 
         img = self.preprocess_inputs(img)
 
@@ -110,6 +110,6 @@ class XViewMicrosoftDataset(Dataset):
         return out_dict
 
     def preprocess_inputs(self, x):
-        x = np.asarray(x, dtype="float32")
+        x = np.asarray(x, dtype=np.float32)
         x /= 255.0
         return x
