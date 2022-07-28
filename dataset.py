@@ -2,6 +2,7 @@ import rasterio as rio
 import torch
 from torch.utils.data import Dataset
 import numpy as np
+from PIL import Image
 
 
 class XViewDataset(Dataset):

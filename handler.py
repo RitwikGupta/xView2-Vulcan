@@ -176,7 +176,6 @@ def postprocess_and_write(result_dict):
 
     preds = np.asarray(preds).astype("float").sum(axis=0)
     msk_dmg = preds.argmax(axis=1)
-    print(msk_dmg.shape)
 
     if v["poly_chip"] != "None":  # Must be a string or PyTorch throws an error
         msk_loc = rasterio.open(v["poly_chip"]).read(1)
@@ -192,7 +191,9 @@ def postprocess_and_write(result_dict):
     loc = msk_loc
     cls = msk_dmg
 
-    sample_result_dict = result_dict["34cls"]
+    print(result_dict)
+
+    sample_result_dict = result_dict["cls"]
     sample_result_dict["geo_profile"].update(dtype=rasterio.uint8)
 
     dst = rasterio.open(
