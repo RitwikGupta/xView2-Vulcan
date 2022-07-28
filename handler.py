@@ -191,8 +191,6 @@ def postprocess_and_write(result_dict):
     loc = msk_loc
     cls = msk_dmg
 
-    print(result_dict)
-
     sample_result_dict = result_dict["cls"]
     sample_result_dict["geo_profile"].update(dtype=rasterio.uint8)
 
