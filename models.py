@@ -139,13 +139,13 @@ class XViewFirstPlaceClsModel(XViewFirstPlaceLocModel):
 
 
 class MicrosoftPlanetModel(nn.Module):
-    def __init__(self, models_folder='weights', devices=[0],
+    def __init__(self, models_folder='weights', device='cpu',
                  checkpoint_name='msft.ckpt', load_models=True, dp_mode=False):
         super(MicrosoftPlanetModel, self).__init__()
         self.model = None
         self.dp_mode = dp_mode
         self.models_folder = models_folder
-        self.devices = devices
+        self.device = device
         self.checkpoint_name = checkpoint_name
         # Allows subclassing without loading models twice
         if load_models:
@@ -158,10 +158,11 @@ class MicrosoftPlanetModel(nn.Module):
                         in_channels=3,
                         classes=4,
                     )
-        checkpoint = torch.load(f"weights/{self.checkpoint_name}", map_location="cpu")
+        checkpoint = torch.load(f"weights/{self.checkpoint_name}", map_location=self.device)
         state_dict = {k.replace("model.", ""): v for k,v in checkpoint["state_dict"].items()}
         self.model.load_state_dict(state_dict)
         self.model.eval()
+        self.model.to(self.device)
 
 
     def execute_model(self, x):
@@ -177,7 +178,7 @@ class MicrosoftPlanetModel(nn.Module):
         b, h, w, c = x.shape
 
         # BHWC -> BCHW
-        x = torch.permute(x, (0, 3, 1, 2))
+        x = torch.permute(x, (0, 3, 1, 2)).to(self.device)
 
         msk = self.model(x)
 
@@ -192,5 +193,6 @@ class MicrosoftPlanetModel(nn.Module):
         msk = msk.argmax(axis=1)
         msk = torch.unsqueeze(msk, axis=1)
         msk = torch.permute(msk, (0, 2, 3, 1))
+        msk = msk.cpu()
 
         return msk

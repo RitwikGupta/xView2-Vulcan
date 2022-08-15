@@ -25,6 +25,7 @@ from models import MicrosoftPlanetModel, XViewFirstPlaceLocModel, XViewFirstPlac
 from loguru import logger
 from osgeo import gdal
 import shapely
+from shapely.geometry import box
 
 
 class Options(object):
@@ -579,7 +580,7 @@ def main():
     return_dict = {}
     results_dict = {}
 
-    cls_model = MicrosoftPlanetModel(checkpoint_name='msft-3.ckpt')
+    cls_model = MicrosoftPlanetModel(checkpoint_name='msft-3.ckpt', device='cuda:0')
     run_inference(
         eval_cls_dataloader,
         cls_model,
@@ -601,6 +602,20 @@ def main():
     f_p = postprocess_and_write
     p.map(f_p, results_list)
 
+    # Create damage and overlay mosaics
+    # Probably stop generating damage mosaic and create overlay from pre and vectors. Stop making overlay from chips
+    logger.info("Creating damage mosaic")
+    dmg_path = Path(args.output_directory) / "dmg"
+    damage_files = [x for x in get_files(dmg_path)]
+    damage_mosaic = raster_processing.create_mosaic(
+        [str(file) for file in damage_files],
+        Path(f"{args.output_directory}/mosaics/damage.tif"),
+        None,
+        None,
+        None,
+        res,
+    )
+
     # Get files for creating vector data
     logger.info("Generating vector data")
     dmg_files = get_files(Path(args.output_directory) / "dmg")
@@ -612,14 +627,11 @@ def main():
         polygons = features.create_polys(dmg_files)
 
     if args.bldg_polys:
+        polygons = in_poly_df.reset_index().overlay(polygons, how="identity") # reset_index preserves a column independent id for joining later
+        polygons = polygons.clip(box(*extent.bounds), keep_geom_type=True)
+        polygons = polygons.groupby("index", as_index=False)
         polygons = (
-            in_poly_df.reset_index()
-            .overlay(polygons, how="identity")
-            .clip(extent, keep_geom_type=True)
-        )  # reset_index preserves a column independent id for joining later
-        polygons = (
-            polygons.groupby("index", as_index=False)
-            .apply(lambda x: features.weight_dmg(x, args.destination_crs))
+            polygons.apply(lambda x: features.weight_dmg(x, args.destination_crs))
             .reset_index(
                 drop=True
             )  # resets multi-index created during grouping/dissolve process
@@ -648,20 +660,6 @@ def main():
     )  # Todo: move this up to right after the polys are simplified to capture some vector data if script crashes
     features.write_output(aoi, vector_out, "aoi")
     features.write_output(centroids, vector_out, "centroids")
-
-    # Create damage and overlay mosaics
-    # Probably stop generating damage mosaic and create overlay from pre and vectors. Stop making overlay from chips
-    logger.info("Creating damage mosaic")
-    dmg_path = Path(args.output_directory) / "dmg"
-    damage_files = [x for x in get_files(dmg_path)]
-    damage_mosaic = raster_processing.create_mosaic(
-        [str(file) for file in damage_files],
-        Path(f"{args.output_directory}/mosaics/damage.tif"),
-        None,
-        None,
-        None,
-        res,
-    )
 
     logger.info("Creating overlay mosaic")
     p = Path(args.output_directory) / "over"

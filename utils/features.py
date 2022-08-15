@@ -1,6 +1,7 @@
 import rasterio
 from rasterio.features import dataset_features
 import geopandas
+from tqdm import tqdm
 
 
 def create_polys(in_files, threshold=30):
@@ -12,7 +13,7 @@ def create_polys(in_files, threshold=30):
     """
 
     polygons = []
-    for idx, f in enumerate(in_files):
+    for idx, f in tqdm(enumerate(in_files)):
         src = rasterio.open(f)
         crs = src.crs
         polygons += list(dataset_features(src, 1, geographic=False))
