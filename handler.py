@@ -629,6 +629,7 @@ def main():
     if args.bldg_polys:
         polygons = in_poly_df.reset_index().overlay(polygons, how="identity") # reset_index preserves a column independent id for joining later
         polygons = polygons.clip(box(*extent.bounds), keep_geom_type=True)
+        # polygons = polygons.clip(polygons.geometry.convex_hull, keep_geom_type=True)
         polygons = polygons.groupby("index", as_index=False)
         polygons = (
             polygons.apply(lambda x: features.weight_dmg(x, args.destination_crs))
